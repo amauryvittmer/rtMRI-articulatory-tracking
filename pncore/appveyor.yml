@@ -1,0 +1,40 @@
+version: '{build}'
+
+init:
+- git config --global core.autocrlf input
+
+environment:
+  matrix:
+  - arch: x86
+    QT5: C:\Qt\5.10.1\mingw53_32
+    MINGW: C:\Qt\Tools\mingw530_32
+
+matrix:
+  fast_finish: true
+
+before_build:
+- set PATH=%MINGW%\bin;%QT5%\bin;%PATH%
+- echo %PATH%
+- ps: $env:COMMIT_TIMESTAMP = $(Get-Date -format yyyy-MM-dd)
+
+build_script:
+# Build Praaline Core Library
+- qmake -v
+- qmake .\pncore.pro CONFIG+=release && mingw32-make
+- copy build\release\pncore.dll .\pncore.dll
+- dir /s
+
+artifacts:
+- path: pncore.dll
+
+deploy:
+  - provider: GitHub
+    release: $(COMMIT_TIMESTAMP)
+    auth_token: 
+      secure: QP8Fu6Yw87cA6bQ0G7hf/MPFzYw0+/wwnLKnMahrETh7gPXh5Ad/2gOIEfvGrfpn
+    artifact: pncore.dll
+    force_update: true
+    on: 
+      branch: master
+
+test: off  # to avoid discovering tests
