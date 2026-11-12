@@ -1,0 +1,67 @@
+version: '{build}'
+
+init:
+- git config --global core.autocrlf input
+
+environment:
+  matrix:
+  - arch: x86
+    QT5: C:\Qt\5.10.0\mingw53_32
+    MINGW: C:\Qt\Tools\mingw530_32
+
+matrix:
+  fast_finish: true
+
+#cache:
+#  build/dependencies
+
+install:
+- git submodule update --init --recursive
+- ps: $releases = "https://api.github.com/repos/praaline/praaline-dependencies/releases"
+- ps: $tag = (Invoke-WebRequest $releases | ConvertFrom-Json)[0].tag_name
+- ps: $download = "https://github.com/praaline/praaline-dependencies/releases/download/$tag/praaline_dependencies_win_x86.zip"
+- ps: Write-Host $download
+- ps: Invoke-WebRequest $download -OutFile praaline_dependencies_win.zip
+
+before_build:
+- set PATH=%MINGW%\bin;%QT5%\bin;%PATH%
+
+build_script:
+- if not exist build mkdir build
+- cd build
+# Path to save plugins
+- mkdir -p .\app\build\plugins
+# Install dependencies
+- 7z e ..\praaline_dependencies_win.zip -o..\build\dependencies\qscintilla\Qt4Qt5\release qscintilla2.dll
+- 7z e ..\praaline_dependencies_win.zip -o..\dependencies\qtilities\bin Qtilities*.dll
+- 7z e ..\praaline_dependencies_win.zip -o..\dependencies\qt-solutions\qtpropertybrowser\lib QtSolutions_PropertyBrowser-head.dll
+# Build Praaline
+- qmake -v
+- qmake ..\PraalineCI.pro CONFIG+=release && mingw32-make
+- dir /s
+
+# Package
+- cd ..
+- mkdir deploy
+# Package dependencies
+- copy build\dependencies\qscintilla\Qt4Qt5\release\qscintilla2.dll deploy\qscintilla2.dll
+- copy dependencies\qtilities\bin\QtilitiesCore-1.5.dll deploy\QtilitiesCore-1.5.dll
+- copy dependencies\qtilities\bin\QtilitiesCoreGui-1.5.dll deploy\QtilitiesCoreGui-1.5.dll
+- copy dependencies\qtilities\bin\QtilitiesExtensionSystem-1.5.dll deploy\QtilitiesExtensionSystem-1.5.dll
+- copy dependencies\qtilities\bin\QtilitiesLogging-1.5.dll deploy\QtilitiesLogging-1.5.dll
+- copy dependencies\qtilities\bin\QtilitiesProjectManagement-1.5.dll deploy\QtilitiesProjectManagement-1.5.dll
+- copy dependencies\qt-solutions\qtpropertybrowser\lib\QtSolutions_PropertyBrowser-head.dll deploy\QtSolutions_PropertyBrowser-head.dll
+# Package build result
+- copy build\app\build\praaline.exe deploy\praaline.exe
+- copy build\pncore\build\release\pncore.dll deploy\pncore.dll
+# WinQtDeploy
+- windeployqt --release deploy/praaline.exe
+- windeployqt --release deploy/pncore.dll
+- windeployqt --release deploy/qscintilla2.dll
+- 7z a Praaline_win_%arch%.zip .\deploy\*
+
+artifacts:
+- path: Praaline_win_$(arch).zip
+#- path: build\app\build\plugins
+
+test: off
